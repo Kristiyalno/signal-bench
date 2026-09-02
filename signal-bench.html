@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signal Bench — Audio Puzzle Toolkit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b0f0e;
+    --panel: #121917;
+    --panel-2: #182220;
+    --border: #24322e;
+    --text: #dbe8e2;
+    --text-dim: #7d938a;
+    --accent: #ffb02e;
+    --accent-dim: #8a6420;
+    --accent2: #49e3b0;
+    --accent2-dim: #23604a;
+    --danger: #ff6b5e;
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at top left, rgba(73,227,176,0.05), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    line-height: 1.5;
+    min-height: 100vh;
+    padding: 28px 20px 60px;
+  }
+  .wrap{ max-width: 1080px; margin: 0 auto; }
+
+  header{ margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 18px; }
+  .brand{ display:flex; align-items:baseline; gap: 12px; flex-wrap: wrap; }
+  h1{
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: 0.5px;
+    margin: 0;
+    color: var(--text);
+  }
+  h1 .dot{ color: var(--accent2); }
+  .sub{ color: var(--text-dim); font-size: 13px; margin-top: 6px; max-width: 60ch; }
+
+  .panel{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .panel h2{
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+    color: var(--accent2);
+    display:flex; align-items:center; gap:8px;
+  }
+  .panel h2 .idx{ color: var(--text-dim); font-family:'IBM Plex Mono',monospace; font-weight:400; font-size:12px; }
+
+  /* Drop zone */
+  #dropzone{
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 26px 18px;
+    text-align:center;
+    cursor:pointer;
+    transition: border-color .15s ease, background .15s ease;
+    background: var(--panel-2);
+  }
+  #dropzone.drag{ border-color: var(--accent2); background: rgba(73,227,176,0.06); }
+  #dropzone p{ margin: 4px 0; color: var(--text-dim); font-size: 13px; }
+  #dropzone strong{ color: var(--text); font-weight: 600; }
+  #fileInput{ display:none; }
+  #fileMeta{ font-size:12px; color: var(--text-dim); margin-top: 10px; min-height: 16px; }
+
+  /* Waveform */
+  canvas{ display:block; width:100%; border-radius: var(--radius); }
+  #waveCanvas{ height:120px; background:#0a1210; border:1px solid var(--border); cursor: crosshair; }
+  .trimRow{ display:flex; gap:10px; align-items:center; margin-top:10px; font-size:12px; color:var(--text-dim); }
+  .trimRow input[type=range]{ flex:1; }
+
+  .transport{ display:flex; align-items:center; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  button{
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor:pointer;
+    transition: border-color .12s ease, color .12s ease;
+  }
+  button:hover:not(:disabled){ border-color: var(--accent2); color: var(--accent2); }
+  button:disabled{ opacity: .4; cursor: not-allowed; }
+  button.primary{ border-color: var(--accent); color: var(--accent); }
+  button.primary:hover:not(:disabled){ background: rgba(255,176,46,0.08); }
+  .timeread{ font-size: 13px; color: var(--text-dim); min-width: 110px; }
+
+  label.check{ display:flex; align-items:center; gap:6px; font-size: 12px; color: var(--text-dim); cursor:pointer; }
+  label.check input{ accent-color: var(--accent2); }
+
+  /* grid layout for controls + spectrogram */
+  .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 780px){ .grid2{ grid-template-columns: 1fr; } }
+
+  .field{ margin-bottom: 16px; }
+  .field:last-child{ margin-bottom: 0; }
+  .field-top{ display:flex; justify-content:space-between; font-size:12px; color: var(--text-dim); margin-bottom:6px; }
+  .field-top span.val{ color: var(--accent2); font-weight:600; }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:3px; background: var(--border); border-radius: 2px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:13px; height:13px; border-radius:50%;
+    background: var(--accent2); cursor:pointer; border: 2px solid #0a1210;
+  }
+  select{
+    font-family:'IBM Plex Mono',monospace;
+    background: var(--panel-2); color: var(--text); border:1px solid var(--border);
+    border-radius: var(--radius); padding:7px 10px; font-size:13px; width:100%;
+  }
+  .row{ display:flex; gap:10px; }
+  .row > *{ flex:1; }
+
+  #specCanvas{ height:180px; background:#050908; border:1px solid var(--border); }
+  .specLegend{ display:flex; align-items:center; gap:8px; margin-top:8px; font-size:11px; color:var(--text-dim); }
+  .specLegend .bar{ height:8px; flex:1; border-radius:2px; background: linear-gradient(90deg,#050908,#123a2e,#1f7a5c,#49e3b0,#ffe08a,#ffb02e); }
+
+  /* morse */
+  #morseEnv{ height:70px; background:#0a1210; border:1px solid var(--border); }
+  .morseOut{
+    margin-top: 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .morseOut .label{ font-size:11px; color:var(--text-dim); text-transform: lowercase; margin-bottom: 4px; }
+  .morseOut .dotdash{ color: var(--accent2); font-size: 13px; word-break: break-all; margin-bottom: 10px; letter-spacing:1px; }
+  .morseOut .decoded{ color: var(--accent); font-size: 20px; font-weight:600; letter-spacing: 3px; word-break: break-all; }
+
+  .hint{ font-size:12px; color: var(--text-dim); margin-top:10px; }
+  .hint code{ background: var(--panel-2); padding:1px 5px; border-radius:2px; color: var(--accent2); }
+
+  .tips{ font-size: 13px; color: var(--text-dim); }
+  .tips ul{ margin: 0; padding-left: 18px; }
+  .tips li{ margin-bottom: 8px; }
+  .tips strong{ color: var(--text); font-weight:600; }
+
+  .empty{ color: var(--text-dim); font-size: 13px; text-align:center; padding: 30px 10px; }
+
+  footer{ text-align:center; color: var(--text-dim); font-size:11px; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1>signal<span class="dot">·</span>bench</h1>
+    </div>
+    <div class="sub">A workbench for cracking audio puzzles — reverse it, slow it down, isolate a channel, look at its spectrogram, or decode it as morse. Nothing leaves your browser.</div>
+  </header>
+
+  <!-- LOAD -->
+  <div class="panel">
+    <h2><span class="idx">01</span> Load a sound</h2>
+    <div id="dropzone">
+      <p><strong>Drop an audio file here</strong>, or click to browse</p>
+      <p>WAV, MP3, OGG, FLAC — whatever your browser can decode</p>
+      <input type="file" id="fileInput" accept="audio/*">
+    </div>
+    <div id="fileMeta"></div>
+  </div>
+
+  <!-- PLAYER -->
+  <div class="panel" id="playerPanel" style="display:none;">
+    <h2><span class="idx">02</span> Waveform &amp; playback</h2>
+    <canvas id="waveCanvas"></canvas>
+    <div class="trimRow">
+      <span>trim</span>
+      <input type="range" id="trimStart" min="0" max="1000" value="0">
+      <input type="range" id="trimEnd" min="0" max="1000" value="1000">
+      <span id="trimReadout">0.00s – 0.00s</span>
+    </div>
+    <div class="transport">
+      <button id="playBtn" class="primary" disabled>▶ Play</button>
+      <button id="stopBtn" disabled>■ Stop</button>
+      <label class="check"><input type="checkbox" id="loopChk"> loop selection</label>
+      <span class="timeread" id="timeread">0:00.00 / 0:00.00</span>
+    </div>
+    <div class="hint">Click the waveform to seek. Drag the trim handles to isolate a section — trim applies to playback, spectrogram, morse analysis and export.</div>
+  </div>
+
+  <div class="grid2" id="controlsRow" style="display:none;">
+    <!-- PLAYBACK CONTROLS -->
+    <div class="panel">
+      <h2><span class="idx">03</span> Signal controls</h2>
+
+      <div class="field">
+        <div class="field-top"><span>speed (playback rate)</span><span class="val" id="speedVal">1.00×</span></div>
+        <input type="range" id="speedSlider" min="0.1" max="4" step="0.01" value="1">
+      </div>
+
+      <div class="field">
+        <div class="field-top"><span>detune</span><span class="val" id="detuneVal">0 cents</span></div>
+        <input type="range" id="detuneSlider" min="-1200" max="1200" step="1" value="0">
+      </div>
+
+      <div class="field">
+        <div class="field-top"><span>gain boost</span><span class="val" id="gainVal">100%</span></div>
+        <input type="range" id="gainSlider" min="0" max="500" step="1" value="100">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <div class="field-top"><span>channel</span></div>
+          <select id="channelSelect">
+            <option value="stereo">Stereo (original)</option>
+            <option value="left">Left only</option>
+            <option value="right">Right only</option>
+            <option value="mono">Mono (L+R)</option>
+            <option value="side">Side (L−R difference)</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-top"><span>direction</span></div>
+          <select id="reverseSelect">
+            <option value="forward">Forward</option>
+            <option value="reverse">Reversed</option>
+          </select>
+        </div>
+      </div>
+
+      <label class="check"><input type="checkbox" id="compChk"> compress dynamics (bring up quiet passages)</label>
+      <div class="hint">The <strong style="color:var(--text)">side</strong> channel cancels anything panned to the center — handy if a hidden message was mixed only into one side. <strong style="color:var(--text)">Reversed</strong> catches backmasked speech; slow it down at the same time.</div>
+    </div>
+
+    <!-- SPECTROGRAM -->
+    <div class="panel">
+      <h2><span class="idx">04</span> Spectrogram</h2>
+      <canvas id="specCanvas"></canvas>
+      <div class="specLegend"><span>quiet</span><div class="bar"></div><span>loud</span></div>
+      <div class="row" style="margin-top:12px;">
+        <button id="specBtn">Generate spectrogram</button>
+        <label class="check"><input type="checkbox" id="specLogChk" checked> log frequency scale</label>
+      </div>
+      <div class="hint">Some puzzles hide an image or text drawn directly into the frequency spectrum. Generate this after trimming to the interesting section for more resolution.</div>
+    </div>
+  </div>
+
+  <!-- MORSE -->
+  <div class="panel" id="morsePanel" style="display:none;">
+    <h2><span class="idx">05</span> Morse decoder</h2>
+    <canvas id="morseEnv"></canvas>
+    <div class="field" style="margin-top:12px;">
+      <div class="field-top"><span>detection threshold</span><span class="val" id="threshVal">18%</span></div>
+      <input type="range" id="threshSlider" min="1" max="80" step="1" value="18">
+    </div>
+    <div class="row">
+      <button id="morseBtn">Analyze beeps as morse</button>
+    </div>
+    <div class="morseOut" id="morseOut" style="display:none;">
+      <div class="label">raw pattern</div>
+      <div class="dotdash" id="morseDotDash">—</div>
+      <div class="label">decoded</div>
+      <div class="decoded" id="morseDecoded">—</div>
+    </div>
+    <div class="hint">Works best on clean tone beeps. If the output is garbled, drag the threshold or trim the clip to just the beeping section first.</div>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="panel" id="exportPanel" style="display:none;">
+    <h2><span class="idx">06</span> Export</h2>
+    <div class="row">
+      <button id="exportBtn" class="primary">Download processed audio (.wav)</button>
+    </div>
+    <div class="hint">Exports exactly what you'd hear right now: trim, channel mode, direction, speed/detune and gain all baked in as a new WAV file.</div>
+  </div>
+
+  <!-- TIPS -->
+  <div class="panel tips">
+    <h2 style="color:var(--text);"><span class="idx">＋</span> Things worth trying on a mystery sound clip</h2>
+    <ul>
+      <li><strong>Reverse it.</strong> Backmasked speech is the oldest trick — flip direction, then slow it down a little too.</li>
+      <li><strong>Slow it way down or speed it way up.</strong> A voice sped 4× can sound like a tone; a tone slowed 4× can turn out to be a voice.</li>
+      <li><strong>Check the spectrogram.</strong> Images and text are sometimes drawn directly into the frequency spectrum — invisible on the waveform, obvious once you look at frequency over time.</li>
+      <li><strong>Isolate a channel.</strong> Stereo files can hide a message in just the left, just the right, or only in the <em>difference</em> between them (the side channel).</li>
+      <li><strong>Listen for beeps.</strong> Regular short/long tones are almost always morse — run the decoder above.</li>
+      <li><strong>Boost the gain and compress.</strong> Whispered or buried audio under a louder layer often becomes clear once amplified.</li>
+      <li><strong>Don't forget the file itself.</strong> Metadata, filenames, and even the raw bytes of an audio file can carry a clue this toolkit won't show you — worth a look in a text/hex editor too.</li>
+    </ul>
+  </div>
+
+  <footer>Everything here runs locally via the Web Audio API — your file is never uploaded anywhere.</footer>
+</div>
+
+<script>
+(function(){
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let actx = null;
+  let originalBuffer = null;   // decoded, untouched
+  let processedBuffer = null;  // channel-mode + reverse applied (full length)
+  let sourceNode = null, gainNode = null, compNode = null;
+  let isPlaying = false, playStartTime = 0, playStartOffset = 0;
+  let rafId = null;
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileMeta = document.getElementById('fileMeta');
+
+  const playerPanel = document.getElementById('playerPanel');
+  const controlsRow = document.getElementById('controlsRow');
+  const morsePanel = document.getElementById('morsePanel');
+  const exportPanel = document.getElementById('exportPanel');
+
+  const waveCanvas = document.getElementById('waveCanvas');
+  const trimStart = document.getElementById('trimStart');
+  const trimEnd = document.getElementById('trimEnd');
+  const trimReadout = document.getElementById('trimReadout');
+  const playBtn = document.getElementById('playBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const loopChk = document.getElementById('loopChk');
+  const timeread = document.getElementById('timeread');
+
+  const speedSlider = document.getElementById('speedSlider');
+  const speedVal = document.getElementById('speedVal');
+  const detuneSlider = document.getElementById('detuneSlider');
+  const detuneVal = document.getElementById('detuneVal');
+  const gainSlider = document.getElementById('gainSlider');
+  const gainVal = document.getElementById('gainVal');
+  const channelSelect = document.getElementById('channelSelect');
+  const reverseSelect = document.getElementById('reverseSelect');
+  const compChk = document.getElementById('compChk');
+
+  const specCanvas = document.getElementById('specCanvas');
+  const specBtn = document.getElementById('specBtn');
+  const specLogChk = document.getElementById('specLogChk');
+
+  const morseEnv = document.getElementById('morseEnv');
+  const threshSlider = document.getElementById('threshSlider');
+  const threshVal = document.getElementById('threshVal');
+  const morseBtn = document.getElementById('morseBtn');
+  const morseOut = document.getElementById('morseOut');
+  const morseDotDash = document.getElementById('morseDotDash');
+  const morseDecoded = document.getElementById('morseDecoded');
+
+  const exportBtn = document.getElementById('exportBtn');
+
+  function ensureCtx(){ if(!actx) actx = new AudioCtx(); return actx; }
+  function fmtTime(s){
+    if(!isFinite(s)) s = 0;
+    const m = Math.floor(s/60), sec = (s - m*60);
+    return m + ':' + sec.toFixed(2).padStart(5,'0');
+  }
+
+  // ---------- FILE LOADING ----------
+  dropzone.addEventListener('click', ()=>fileInput.click());
+  ['dragenter','dragover'].forEach(evt=>dropzone.addEventListener(evt, e=>{ e.preventDefault(); dropzone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(evt=>dropzone.addEventListener(evt, e=>{ e.preventDefault(); dropzone.classList.remove('drag'); }));
+  dropzone.addEventListener('drop', e=>{
+    const f = e.dataTransfer.files[0];
+    if(f) loadFile(f);
+  });
+  fileInput.addEventListener('change', e=>{
+    const f = e.target.files[0];
+    if(f) loadFile(f);
+  });
+
+  function loadFile(file){
+    fileMeta.textContent = 'decoding ' + file.name + ' …';
+    const reader = new FileReader();
+    reader.onload = function(e){
+      ensureCtx();
+      actx.decodeAudioData(e.target.result.slice(0), function(buf){
+        originalBuffer = buf;
+        fileMeta.textContent = file.name + '  ·  ' + buf.numberOfChannels + 'ch  ·  ' + buf.sampleRate + 'Hz  ·  ' + fmtTime(buf.duration) + ' long';
+        trimStart.value = 0; trimEnd.value = 1000;
+        rebuildProcessed();
+        [playerPanel, controlsRow, morsePanel, exportPanel].forEach(p=>p.style.display='');
+        playBtn.disabled = false; stopBtn.disabled = false;
+        drawWaveform();
+        updateTrimReadout();
+      }, function(err){
+        fileMeta.textContent = 'Could not decode that file — try a different format.';
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ---------- BUFFER PROCESSING (channel mode + reverse) ----------
+  function applyChannelMode(buf, mode){
+    const len = buf.length, sr = buf.sampleRate;
+    const L = buf.getChannelData(0);
+    const R = buf.numberOfChannels > 1 ? buf.getChannelData(1) : L;
+    if(mode === 'stereo' && buf.numberOfChannels > 1){
+      const out = ensureCtx().createBuffer(2, len, sr);
+      out.copyToChannel(L.slice(), 0);
+      out.copyToChannel(R.slice(), 1);
+      return out;
+    }
+    const out = ensureCtx().createBuffer(1, len, sr);
+    const data = new Float32Array(len);
+    if(mode === 'left') data.set(L);
+    else if(mode === 'right') data.set(R);
+    else if(mode === 'mono') for(let i=0;i<len;i++) data[i] = (L[i]+R[i])/2;
+    else if(mode === 'side') for(let i=0;i<len;i++) data[i] = (L[i]-R[i])/2;
+    else data.set(L); // stereo fallback for mono source
+    out.copyToChannel(data, 0);
+    return out;
+  }
+
+  function reverseBuffer(buf){
+    const out = ensureCtx().createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+    for(let c=0;c<buf.numberOfChannels;c++){
+      const src = buf.getChannelData(c);
+      const rev = new Float32Array(src.length);
+      for(let i=0;i<src.length;i++) rev[i] = src[src.length-1-i];
+      out.copyToChannel(rev, c);
+    }
+    return out;
+  }
+
+  function rebuildProcessed(){
+    if(!originalBuffer) return;
+    let buf = applyChannelMode(originalBuffer, channelSelect.value);
+    if(reverseSelect.value === 'reverse') buf = reverseBuffer(buf);
+    processedBuffer = buf;
+    drawWaveform();
+  }
+
+  channelSelect.addEventListener('change', ()=>{ stopPlayback(); rebuildProcessed(); });
+  reverseSelect.addEventListener('change', ()=>{ stopPlayback(); rebuildProcessed(); });
+
+  // ---------- TRIM ----------
+  function trimBounds(){
+    const dur = processedBuffer ? processedBuffer.duration : 0;
+    const s = (trimStart.value/1000) * dur;
+    const e = (trimEnd.value/1000) * dur;
+    return { s: Math.min(s,e), e: Math.max(s,e), dur };
+  }
+  function updateTrimReadout(){
+    const {s,e} = trimBounds();
+    trimReadout.textContent = s.toFixed(2)+'s – '+e.toFixed(2)+'s';
+    drawWaveform();
+  }
+  trimStart.addEventListener('input', updateTrimReadout);
+  trimEnd.addEventListener('input', updateTrimReadout);
+
+  function getTrimmedBuffer(){
+    if(!processedBuffer) return null;
+    const {s,e} = trimBounds();
+    const sr = processedBuffer.sampleRate;
+    const startSample = Math.floor(s*sr);
+    const endSample = Math.max(startSample+1, Math.floor(e*sr));
+    const len = endSample - startSample;
+    const out = ensureCtx().createBuffer(processedBuffer.numberOfChannels, len, sr);
+    for(let c=0;c<processedBuffer.numberOfChannels;c++){
+      out.copyToChannel(processedBuffer.getChannelData(c).slice(startSample, endSample), c);
+    }
+    return out;
+  }
+
+  // ---------- WAVEFORM ----------
+  function drawWaveform(){
+    const ctx = waveCanvas.getContext('2d');
+    const w = waveCanvas.clientWidth || 600, h = 120;
+    waveCanvas.width = w * devicePixelRatio; waveCanvas.height = h * devicePixelRatio;
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    ctx.clearRect(0,0,w,h);
+    if(!processedBuffer){ return; }
+    const data = processedBuffer.getChannelData(0);
+    const mid = h/2;
+    ctx.strokeStyle = '#24322e'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,mid); ctx.lineTo(w,mid); ctx.stroke();
+
+    const step = Math.max(1, Math.floor(data.length/w));
+    ctx.strokeStyle = '#49e3b0'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for(let x=0;x<w;x++){
+      let min=1,max=-1;
+      const start = x*step;
+      for(let i=0;i<step;i++){
+        const v = data[start+i]; if(v===undefined) continue;
+        if(v<min) min=v; if(v>max) max=v;
+      }
+      ctx.moveTo(x, mid + min*mid*0.92);
+      ctx.lineTo(x, mid + max*mid*0.92);
+    }
+    ctx.stroke();
+
+    // trim shading
+    const {s,e,dur} = trimBounds();
+    if(dur>0){
+      const x1 = (s/dur)*w, x2=(e/dur)*w;
+      ctx.fillStyle = 'rgba(255,176,46,0.08)';
+      ctx.fillRect(0,0,x1,h);
+      ctx.fillRect(x2,0,w-x2,h);
+      ctx.strokeStyle = 'rgba(255,176,46,0.6)';
+      ctx.beginPath(); ctx.moveTo(x1,0); ctx.lineTo(x1,h); ctx.moveTo(x2,0); ctx.lineTo(x2,h); ctx.stroke();
+    }
+
+    // playhead
+    if(isPlaying && dur>0){
+      const cur = getCurrentTime();
+      const x = (cur/dur)*w;
+      ctx.strokeStyle = '#ffb02e'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke();
+    }
+  }
+
+  waveCanvas.addEventListener('click', e=>{
+    if(!processedBuffer) return;
+    const rect = waveCanvas.getBoundingClientRect();
+    const frac = (e.clientX-rect.left)/rect.width;
+    const target = frac*processedBuffer.duration;
+    playFrom(target);
+  });
+
+  // ---------- PLAYBACK ----------
+  function getCurrentTime(){
+    if(!isPlaying) return playStartOffset;
+    const rate = parseFloat(speedSlider.value);
+    return playStartOffset + (actx.currentTime - playStartTime)*rate;
+  }
+
+  function stopPlayback(){
+    if(sourceNode){ try{ sourceNode.onended=null; sourceNode.stop(); }catch(e){} sourceNode=null; }
+    isPlaying = false;
+    playBtn.textContent = '▶ Play';
+    if(rafId) cancelAnimationFrame(rafId);
+  }
+
+  function playFrom(offset){
+    stopPlayback();
+    ensureCtx();
+    if(actx.state==='suspended') actx.resume();
+    const {s,e} = trimBounds();
+    if(offset < s || offset >= e) offset = s;
+
+    sourceNode = actx.createBufferSource();
+    sourceNode.buffer = processedBuffer;
+    sourceNode.playbackRate.value = parseFloat(speedSlider.value);
+    sourceNode.detune.value = parseFloat(detuneSlider.value);
+
+    gainNode = actx.createGain();
+    gainNode.gain.value = parseFloat(gainSlider.value)/100;
+
+    let chain = sourceNode;
+    if(compChk.checked){
+      compNode = actx.createDynamicsCompressor();
+      compNode.threshold.value = -45;
+      compNode.knee.value = 30;
+      compNode.ratio.value = 8;
+      compNode.attack.value = 0.005;
+      compNode.release.value = 0.15;
+      chain.connect(compNode);
+      chain = compNode;
+    }
+    chain.connect(gainNode).connect(actx.destination);
+
+    const dur = e - offset;
+    sourceNode.start(0, offset, Math.max(0.001, dur));
+    playStartTime = actx.currentTime;
+    playStartOffset = offset;
+    isPlaying = true;
+    playBtn.textContent = '❚❚ Pause';
+
+    sourceNode.onended = ()=>{
+      if(!isPlaying) return; // was manually stopped
+      if(loopChk.checked){
+        playFrom(trimBounds().s);
+      } else {
+        isPlaying = false;
+        playBtn.textContent = '▶ Play';
+        playStartOffset = trimBounds().s;
+        drawWaveform();
+      }
+    };
+    tick();
+  }
+
+  function tick(){
+    drawWaveform();
+    const dur = processedBuffer ? processedBuffer.duration : 0;
+    timeread.textContent = fmtTime(getCurrentTime()) + ' / ' + fmtTime(dur);
+    if(isPlaying) rafId = requestAnimationFrame(tick);
+  }
+
+  playBtn.addEventListener('click', ()=>{
+    if(!processedBuffer) return;
+    if(isPlaying){ playStartOffset = getCurrentTime(); stopPlayback(); drawWaveform(); timeread.textContent = fmtTime(playStartOffset)+' / '+fmtTime(processedBuffer.duration); }
+    else { playFrom(playStartOffset || trimBounds().s); }
+  });
+  stopBtn.addEventListener('click', ()=>{
+    stopPlayback();
+    playStartOffset = trimBounds().s;
+    drawWaveform();
+    timeread.textContent = fmtTime(playStartOffset)+' / '+fmtTime(processedBuffer?processedBuffer.duration:0);
+  });
+
+  speedSlider.addEventListener('input', ()=>{
+    speedVal.textContent = parseFloat(speedSlider.value).toFixed(2)+'×';
+    if(sourceNode) sourceNode.playbackRate.value = parseFloat(speedSlider.value);
+  });
+  detuneSlider.addEventListener('input', ()=>{
+    detuneVal.textContent = detuneSlider.value + ' cents';
+    if(sourceNode) sourceNode.detune.value = parseFloat(detuneSlider.value);
+  });
+  gainSlider.addEventListener('input', ()=>{
+    gainVal.textContent = gainSlider.value + '%';
+    if(gainNode) gainNode.gain.value = parseFloat(gainSlider.value)/100;
+  });
+  compChk.addEventListener('change', ()=>{
+    if(isPlaying) playFrom(getCurrentTime());
+  });
+
+  // ---------- SPECTROGRAM ----------
+  function fft(re, im){
+    const n = re.length;
+    for(let i=1,j=0;i<n;i++){
+      let bit = n>>1;
+      for(; j&bit; bit>>=1) j ^= bit;
+      j ^= bit;
+      if(i<j){ [re[i],re[j]]=[re[j],re[i]]; [im[i],im[j]]=[im[j],im[i]]; }
+    }
+    for(let len=2; len<=n; len<<=1){
+      const ang = -2*Math.PI/len;
+      const wr = Math.cos(ang), wi = Math.sin(ang);
+      for(let i=0;i<n;i+=len){
+        let cwr=1, cwi=0;
+        for(let k=0;k<len/2;k++){
+          const ur=re[i+k], ui=im[i+k];
+          const vr=re[i+k+len/2]*cwr - im[i+k+len/2]*cwi;
+          const vi=re[i+k+len/2]*cwi + im[i+k+len/2]*cwr;
+          re[i+k]=ur+vr; im[i+k]=ui+vi;
+          re[i+k+len/2]=ur-vr; im[i+k+len/2]=ui-vi;
+          const ncwr = cwr*wr - cwi*wi, ncwi = cwr*wi + cwi*wr;
+          cwr=ncwr; cwi=ncwi;
+        }
+      }
+    }
+  }
+
+  function generateSpectrogram(){
+    const buf = getTrimmedBuffer();
+    if(!buf) return;
+    const data = buf.getChannelData(0);
+    const FFT_SIZE = 1024, HOP = 256;
+    const numFrames = Math.max(1, Math.floor((data.length - FFT_SIZE)/HOP));
+    const w = specCanvas.clientWidth || 600, h = 180;
+    specCanvas.width = w*devicePixelRatio; specCanvas.height = h*devicePixelRatio;
+    const ctx = specCanvas.getContext('2d');
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    ctx.clearRect(0,0,w,h);
+
+    const window_ = new Float32Array(FFT_SIZE);
+    for(let i=0;i<FFT_SIZE;i++) window_[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(FFT_SIZE-1));
+
+    const halfBins = FFT_SIZE/2;
+    const useLog = specLogChk.checked;
+    let maxDb = -Infinity, minDb = Infinity;
+    const frameData = [];
+
+    for(let f=0; f<numFrames; f++){
+      const re = new Float32Array(FFT_SIZE), im = new Float32Array(FFT_SIZE);
+      const start = f*HOP;
+      for(let i=0;i<FFT_SIZE;i++) re[i] = (data[start+i]||0) * window_[i];
+      fft(re, im);
+      const mags = new Float32Array(halfBins);
+      for(let k=0;k<halfBins;k++){
+        const mag = Math.sqrt(re[k]*re[k]+im[k]*im[k]);
+        const db = 20*Math.log10(mag+1e-9);
+        mags[k]=db;
+        if(db>maxDb) maxDb=db;
+        if(db<minDb) minDb=db;
+      }
+      frameData.push(mags);
+    }
+    minDb = Math.max(minDb, maxDb-70);
+
+    function colorFor(t){
+      // t in [0,1] -> dark -> teal -> green -> amber
+      const stops = [
+        [5,9,8],[18,58,46],[31,122,92],[73,227,176],[255,224,138],[255,176,46]
+      ];
+      const pos = t*(stops.length-1);
+      const i0 = Math.floor(pos), i1 = Math.min(stops.length-1,i0+1);
+      const f = pos-i0;
+      const c0=stops[i0], c1=stops[i1];
+      const r = c0[0]+(c1[0]-c0[0])*f, g=c0[1]+(c1[1]-c0[1])*f, b=c0[2]+(c1[2]-c0[2])*f;
+      return 'rgb('+(r|0)+','+(g|0)+','+(b|0)+')';
+    }
+
+    const colW = w/numFrames;
+    for(let f=0; f<numFrames; f++){
+      const mags = frameData[f];
+      for(let y=0;y<h;y++){
+        // map pixel row to bin (log or linear)
+        let frac = 1 - y/h;
+        let bin;
+        if(useLog){
+          const logMin = Math.log(1), logMax = Math.log(halfBins);
+          bin = Math.round(Math.exp(logMin + frac*(logMax-logMin)))-1;
+        } else {
+          bin = Math.round(frac*(halfBins-1));
+        }
+        bin = Math.max(0, Math.min(halfBins-1, bin));
+        const db = mags[bin];
+        const t = Math.max(0, Math.min(1, (db-minDb)/(maxDb-minDb)));
+        ctx.fillStyle = colorFor(t);
+        ctx.fillRect(f*colW, y, colW+1, 1);
+      }
+    }
+  }
+  specBtn.addEventListener('click', generateSpectrogram);
+  specLogChk.addEventListener('change', ()=>{ if(processedBuffer) generateSpectrogram(); });
+
+  // ---------- MORSE DECODER ----------
+  const MORSE = {
+    '.-':'A','-...':'B','-.-.':'C','-..':'D','.':'E','..-.':'F','--.':'G','....':'H','..':'I',
+    '.---':'J','-.-':'K','.-..':'L','--':'M','-.':'N','---':'O','.--.':'P','--.-':'Q','.-.':'R',
+    '...':'S','-':'T','..-':'U','...-':'V','.--':'W','-..-':'X','-.--':'Y','--..':'Z',
+    '-----':'0','.----':'1','..---':'2','...--':'3','....-':'4','.....':'5','-....':'6','--...':'7','---..':'8','----.':'9'
+  };
+
+  threshSlider.addEventListener('input', ()=>{ threshVal.textContent = threshSlider.value+'%'; });
+
+  function drawEnvelope(env, onMask, w, h){
+    const ctx = morseEnv.getContext('2d');
+    morseEnv.width = w*devicePixelRatio; morseEnv.height = h*devicePixelRatio;
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = '#0a1210'; ctx.fillRect(0,0,w,h);
+    for(let x=0;x<w;x++){
+      const idx = Math.floor(x/w*env.length);
+      const v = env[idx]||0;
+      ctx.fillStyle = onMask[idx] ? '#ffb02e' : '#2a3a35';
+      const barH = v*h;
+      ctx.fillRect(x, h-barH, 1, barH);
+    }
+  }
+
+  function analyzeMorse(){
+    const buf = getTrimmedBuffer();
+    if(!buf) return;
+    const data = buf.getChannelData(0);
+    const sr = buf.sampleRate;
+    const winSize = Math.max(32, Math.floor(sr*0.005)); // ~5ms envelope window
+    const numWins = Math.floor(data.length/winSize);
+    const env = new Float32Array(numWins);
+    let maxV = 0;
+    for(let i=0;i<numWins;i++){
+      let sum=0;
+      for(let j=0;j<winSize;j++){ const v=data[i*winSize+j]; sum += v*v; }
+      const rms = Math.sqrt(sum/winSize);
+      env[i]=rms;
+      if(rms>maxV) maxV=rms;
+    }
+    if(maxV<1e-6){ morseOut.style.display=''; morseDotDash.textContent='(silence)'; morseDecoded.textContent='—'; return; }
+    for(let i=0;i<numWins;i++) env[i] = env[i]/maxV;
+
+    const thresh = parseFloat(threshSlider.value)/100;
+    const onMask = new Uint8Array(numWins);
+    for(let i=0;i<numWins;i++) onMask[i] = env[i] > thresh ? 1 : 0;
+
+    drawEnvelope(env, onMask, morseEnv.clientWidth||600, 70);
+
+    // find runs
+    const runs = []; // {on:bool, len: windows}
+    let cur = onMask[0], len=0;
+    for(let i=0;i<numWins;i++){
+      if(onMask[i]===cur){ len++; }
+      else { runs.push({on:cur, len}); cur=onMask[i]; len=1; }
+    }
+    runs.push({on:cur, len});
+
+    const winSeconds = winSize/sr;
+    // filter tiny noise blips (< 15ms)
+    const minRunWins = Math.max(1, Math.round(0.015/winSeconds));
+    const cleaned = runs.filter(r => r.len >= minRunWins || r.on===0);
+    // merge consecutive same-type after filtering
+    const merged = [];
+    for(const r of cleaned){
+      if(merged.length && merged[merged.length-1].on === r.on) merged[merged.length-1].len += r.len;
+      else merged.push({...r});
+    }
+    const onRuns = merged.filter(r=>r.on).map(r=>r.len);
+    if(onRuns.length===0){
+      morseOut.style.display=''; morseDotDash.textContent='(no beeps detected — lower the threshold)'; morseDecoded.textContent='—';
+      return;
+    }
+    const unit = Math.min(...onRuns); // shortest ON run = 1 unit (a dot)
+
+    let pattern = '';
+    let text = '';
+    let currentLetter = '';
+    for(let i=0;i<merged.length;i++){
+      const r = merged[i];
+      const units = r.len/unit;
+      if(r.on){
+        if(units < 2) { pattern += '.'; currentLetter += '.'; }
+        else { pattern += '-'; currentLetter += '-'; }
+      } else {
+        if(i === merged.length-1) continue; // trailing silence
+        if(units < 2){ pattern += ' '; } // intra-letter gap, ignore for decode
+        else if(units < 5){
+          pattern += ' / ';
+          text += (MORSE[currentLetter] || '?');
+          currentLetter='';
+        } else {
+          pattern += ' // ';
+          text += (MORSE[currentLetter] || '?') + ' ';
+          currentLetter='';
+        }
+      }
+    }
+    if(currentLetter) text += (MORSE[currentLetter] || '?');
+
+    morseOut.style.display = '';
+    morseDotDash.textContent = pattern.trim() || '—';
+    morseDecoded.textContent = text.trim() || '—';
+  }
+  morseBtn.addEventListener('click', analyzeMorse);
+
+  // ---------- EXPORT (WAV) ----------
+  function bufferToWav(buf){
+    const numCh = buf.numberOfChannels, sr = buf.sampleRate, len = buf.length;
+    const bytesPerSample = 2;
+    const blockAlign = numCh*bytesPerSample;
+    const dataSize = len*blockAlign;
+    const bufferArr = new ArrayBuffer(44+dataSize);
+    const view = new DataView(bufferArr);
+    function writeStr(off,str){ for(let i=0;i<str.length;i++) view.setUint8(off+i, str.charCodeAt(i)); }
+    writeStr(0,'RIFF'); view.setUint32(4, 36+dataSize, true); writeStr(8,'WAVE');
+    writeStr(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);
+    view.setUint16(22,numCh,true); view.setUint32(24,sr,true);
+    view.setUint32(28, sr*blockAlign, true); view.setUint16(32, blockAlign, true); view.setUint16(34,16,true);
+    writeStr(36,'data'); view.setUint32(40, dataSize, true);
+    const channels = [];
+    for(let c=0;c<numCh;c++) channels.push(buf.getChannelData(c));
+    let offset=44;
+    for(let i=0;i<len;i++){
+      for(let c=0;c<numCh;c++){
+        let s = Math.max(-1, Math.min(1, channels[c][i]));
+        view.setInt16(offset, s<0? s*0x8000 : s*0x7FFF, true);
+        offset+=2;
+      }
+    }
+    return new Blob([bufferArr], {type:'audio/wav'});
+  }
+
+  function offlineRender(buf, rate, detuneCents, gainAmt){
+    // render through an OfflineAudioContext to bake in speed/detune/gain
+    const outLen = Math.ceil(buf.length / rate) + 1;
+    return new Promise(resolve=>{
+      const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      const octx = new OfflineCtx(buf.numberOfChannels, outLen, buf.sampleRate);
+      const src = octx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate;
+      src.detune.value = detuneCents;
+      const g = octx.createGain();
+      g.gain.value = gainAmt;
+      src.connect(g).connect(octx.destination);
+      src.start(0);
+      octx.startRendering().then(resolve);
+    });
+  }
+
+  exportBtn.addEventListener('click', async ()=>{
+    const buf = getTrimmedBuffer();
+    if(!buf) return;
+    exportBtn.disabled = true; exportBtn.textContent = 'rendering…';
+    try{
+      const rate = parseFloat(speedSlider.value);
+      const detune = parseFloat(detuneSlider.value);
+      const gainAmt = parseFloat(gainSlider.value)/100;
+      const rendered = await offlineRender(buf, rate, detune, gainAmt);
+      const blob = bufferToWav(rendered);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'signal-bench-export.wav';
+      a.click();
+    } finally {
+      exportBtn.disabled = false; exportBtn.textContent = 'Download processed audio (.wav)';
+    }
+  });
+
+  window.addEventListener('resize', ()=>{ drawWaveform(); });
+})();
+</script>
+</body>
+</html>
